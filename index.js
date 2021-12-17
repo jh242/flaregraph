@@ -1,74 +1,21 @@
-import { Router } from 'itty-router'
-
-import { getPosts, postPosts } from './controllers/posts';
+import { Router } from 'itty-router';
+import { getPosts, patchPost, postPosts, postComment, getComments } from './controllers/posts';
 
 // Create a new router
-const router = Router()
+const router = Router();
 
 /*
 Our index route, a simple hello world.
 */
 router.get("/", () => {
-  return new Response("Hello, world! This is the root page of your Worker template.")
-})
+  return new Response("The princess is in another castle!");
+});
 
 router.get("/posts", getPosts);
 router.post("/posts", postPosts);
-
-/*
-This route demonstrates path parameters, allowing you to extract fragments from the request
-URL.
-
-Try visit /example/hello and see the response.
-*/
-router.get("/example/:text", ({ params }) => {
-  // Decode text like "Hello%20world" into "Hello world"
-  let input = decodeURIComponent(params.text)
-
-  // Construct a buffer from our input
-  let buffer = Buffer.from(input, "utf8")
-
-  // Serialise the buffer into a base64 string
-  let base64 = buffer.toString("base64")
-
-  // Return the HTML with the string to the client
-  return new Response(`<p>Base64 encoding: <code>${base64}</code></p>`, {
-    headers: {
-      "Content-Type": "text/html"
-    }
-  })
-})
-
-/*
-This shows a different HTTP method, a POST.
-
-Try send a POST request using curl or another tool.
-
-Try the below curl command to send JSON:
-
-$ curl -X POST <worker> -H "Content-Type: application/json" -d '{"abc": "def"}'
-*/
-router.post("/post", async request => {
-  // Create a base object with some fields.
-  let fields = {
-    "asn": request.cf.asn,
-    "colo": request.cf.colo
-  }
-
-  // If the POST data is JSON then attach it to our response.
-  if (request.headers.get("Content-Type") === "application/json") {
-    fields["json"] = await request.json()
-  }
-
-  // Serialise the JSON to a string.
-  const returnData = JSON.stringify(fields, null, 2);
-
-  return new Response(returnData, {
-    headers: {
-      "Content-Type": "application/json"
-    }
-  })
-})
+router.post("/post/:postId", patchPost); // Would normally use patch but just avoiding preflights for the sake of time
+router.get("/post/:postId/comments", getComments);
+router.post("/post/:postId/comment", postComment);
 
 /*
 This is the last route we define, it will match anything that hasn't hit a route we've defined
@@ -76,12 +23,12 @@ above, therefore it's useful as a 404 (and avoids us hitting worker exceptions, 
 
 Visit any page that doesn't exist (e.g. /foobar) to see it in action.
 */
-router.all("*", () => new Response("404, not found!", { status: 404 }))
+router.all("*", () => new Response("404, not found!", { status: 404 }));
 
 /*
 This snippet ties our worker to the router we deifned above, all incoming requests
 are passed to the router where your routes are called and the response is sent.
 */
 addEventListener('fetch', (e) => {
-  e.respondWith(router.handle(e.request))
-})
+  e.respondWith(router.handle(e.request));
+});
