@@ -1,0 +1,12 @@
+name = "flaregraph"
+type = "webpack"
+
+account_id = "2fe04e66a30a5790b44d6f881008ea8b"
+workers_dev = true
+route = ""
+zone_id = ""
+compatibility_date = "2021-12-16"
+
+kv_namespaces = [ 
+    { binding = "FLAREGRAPH_POSTS", preview_id = "c9872f6bce4348fd8b150618de4fb16f", id = "31c38f091fbb44fa9f86889e3f6458c4" }
+]
