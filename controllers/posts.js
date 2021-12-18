@@ -1,22 +1,25 @@
-import {v4 as uuid} from 'uuid';
+import { v4 as uuid } from 'uuid'
 
-const validatePost = (post) => {
-    const allFields = post.title && post.username && post.content && post.timestamp;
+const validatePost = post => {
+    const allFields =
+        post.title && post.username && post.content && post.timestamp
 
-    return allFields;
+    return allFields
 }
 
 export const getPosts = async () => {
+    const postKeys = await FLAREGRAPH_POSTS.list()
+    const postPromises = []
 
-    const postKeys = await FLAREGRAPH_POSTS.list();
-    const postPromises = [];
-
-    for(const key of postKeys.keys) {
-        postPromises.push(FLAREGRAPH_POSTS.get(key.name));
+    for (const key of postKeys.keys) {
+        if (!key.name.includes('comments')) { 
+            // Filter out entries for comments. Normally I would separate this into another KV namespace, though.
+            postPromises.push(FLAREGRAPH_POSTS.get(key.name))
+        }
     }
 
-    const posts = await Promise.all(postPromises);
-    const responseData = posts.map((post) => (JSON.parse(post)));
+    const posts = await Promise.all(postPromises)
+    const responseData = posts.map(post => JSON.parse(post))
 
     return new Response(JSON.stringify(responseData), {
         headers: {
@@ -24,15 +27,15 @@ export const getPosts = async () => {
             'Access-Control-Allow-Origin': '*',
         },
         status: 200,
-        statusText: 'success'
-    });
+        statusText: 'success',
+    })
 }
 
-export const postPosts = async (request) => {
-    const data = await request.json();
-    const { title, username, content } = data;
-    const timestamp = Date.now();
-    const postId = uuid();
+export const postPosts = async request => {
+    const data = await request.json()
+    const { title, username, content } = data
+    const timestamp = Date.now()
+    const postId = uuid()
 
     const post = {
         postId,
@@ -41,10 +44,10 @@ export const postPosts = async (request) => {
         content,
         timestamp,
         likes: 0,
-    };
+    }
 
-    if(validatePost(post)) {
-        await FLAREGRAPH_POSTS.put(postId, JSON.stringify(post));
+    if (validatePost(post)) {
+        await FLAREGRAPH_POSTS.put(postId, JSON.stringify(post))
 
         return new Response(JSON.stringify(post), {
             headers: {
@@ -53,20 +56,23 @@ export const postPosts = async (request) => {
             },
             status: 201,
             statusText: 'success',
-        });
+        })
     }
 
-    return new Response(null, {status: 400, statusText: 'invalid post format'});
+    return new Response(null, {
+        status: 400,
+        statusText: 'invalid post format',
+    })
 }
 
-export const patchPost = async (request) => {
-    const data = await request.json(); 
-    const { postId } = request.params;
+export const patchPost = async request => {
+    const data = await request.json()
+    const { postId } = request.params
 
-    const post = JSON.parse(await FLAREGRAPH_POSTS.get(postId));
-    const updatedPost = {...post, ...data};
+    const post = JSON.parse(await FLAREGRAPH_POSTS.get(postId))
+    const updatedPost = { ...post, ...data }
 
-    await FLAREGRAPH_POSTS.put(postId, JSON.stringify(updatedPost));
+    await FLAREGRAPH_POSTS.put(postId, JSON.stringify(updatedPost))
 
     return new Response(JSON.stringify(updatedPost), {
         headers: {
@@ -75,12 +81,12 @@ export const patchPost = async (request) => {
         },
         status: 200,
         statusText: 'success',
-    });
+    })
 }
 
-export const getComments = async (request) => {
-    const { postId } = request.params;
-    const data = (await FLAREGRAPH_POSTS.get(`${postId}_comments`)) ?? [];
+export const getComments = async request => {
+    const { postId } = request.params
+    const data = await FLAREGRAPH_POSTS.get(`${postId}_comments`)
 
     return new Response(JSON.stringify(data), {
         headers: {
@@ -89,26 +95,39 @@ export const getComments = async (request) => {
         },
         status: 200,
         statusText: 'success',
-    });
+    })
 }
 
-export const postComment = async (request) => {
+export const postComment = async request => {
     // Request body format:
     // {
     //     username: string
     //     content: string
     // }
-    const { postId } = request.params;
-    const data = await request.json();
+    const { postId } = request.params
 
-    let comments = JSON.parse(await FLAREGRAPH_POSTS.get(`${postId}_comments`));
-    if(comments) {
-        comments.push(data);
+    let promises = [
+        request.json(),
+        FLAREGRAPH_POSTS.get(postId),
+        FLAREGRAPH_POSTS.get(`${postId}_comments`),
+    ]
+    let [data, post, comments] = await Promise.all(promises)
+
+    data.timestamp = Date.now()
+    post = JSON.parse(post)
+    comments = JSON.parse(comments)
+    if (comments) {
+        comments.push(data)
     } else {
-        comments = [data];
+        comments = [data]
     }
+    post.comments = post.comments ? post.comments + 1 : 1
 
-    await FLAREGRAPH_POSTS.put(`${postId}_comments`, JSON.stringify(comments));
+    promises = [
+        FLAREGRAPH_POSTS.put(`${postId}_comments`, JSON.stringify(comments)),
+        FLAREGRAPH_POSTS.put(postId, JSON.stringify(post)),
+    ]
+    await Promise.all(promises)
 
     return new Response(JSON.stringify(comments), {
         headers: {
@@ -117,6 +136,5 @@ export const postComment = async (request) => {
         },
         status: 200,
         statusText: 'success',
-    });
-
+    })
 }
